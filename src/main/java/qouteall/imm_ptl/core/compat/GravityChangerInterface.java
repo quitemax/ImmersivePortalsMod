@@ -1,7 +1,7 @@
 package qouteall.imm_ptl.core.compat;
 
 import gravity_changer.api.GravityChangerAPI;
-import gravity_changer.util.RotationUtil;
+import gravity_changer.rotation.RotationUtil;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;

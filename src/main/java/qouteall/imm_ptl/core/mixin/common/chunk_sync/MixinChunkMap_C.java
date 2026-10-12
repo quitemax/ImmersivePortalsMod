@@ -74,7 +74,9 @@ public abstract class MixinChunkMap_C implements IEChunkMap {
      * @reason
      */
     @Overwrite
-    private void onChunkReadyToSend(LevelChunk chunk) {
+    private void onChunkReadyToSend(ChunkHolder chunkHolder, LevelChunk chunk) {
         ImmPtlChunkTracking.onChunkProvidedDeferred(chunk);
+        // keep the vanilla block change broadcasting
+        this.level.getChunkSource().onChunkReadyToSend(chunkHolder);
     }
 }

@@ -1,4 +1,5 @@
 package qouteall.imm_ptl.core.portal;
+import net.minecraft.util.profiling.Profiler;
 
 import com.mojang.logging.LogUtils;
 import net.fabricmc.api.EnvType;
@@ -210,7 +211,7 @@ public class PortalRenderInfo implements AutoCloseable {
     }
     
     public static boolean renderAndDecideVisibility(Portal portal, Runnable queryRendering) {
-        ProfilerFiller profiler = Minecraft.getInstance().getProfiler();
+        ProfilerFiller profiler = Profiler.get();
         
         boolean decision;
         if (IPGlobal.offsetOcclusionQuery) {

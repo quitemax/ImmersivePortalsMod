@@ -151,31 +151,37 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
         }
     }
     
-    @Redirect(
-        method = "Lnet/minecraft/world/entity/Entity;checkInsideBlocks()V",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/world/entity/Entity;getBoundingBox()Lnet/minecraft/world/phys/AABB;"
-        )
-    )
-    private AABB redirectBoundingBoxInCheckingBlockCollision(Entity entity) {
-        return ip_getActiveCollisionBox(entity.getBoundingBox());
-    }
-    
+    @Shadow
+    protected abstract AABB makeBoundingBox(Vec3 position);
+
+    // use the active collision box (the part not behind the portal) for the inside-block check
     @Inject(
-        method = "checkInsideBlocks",
-        at = @At(
-            value = "INVOKE_ASSIGN",
-            target = "Lnet/minecraft/world/entity/Entity;getBoundingBox()Lnet/minecraft/world/phys/AABB;",
-            shift = At.Shift.AFTER
-        ),
-        locals = LocalCapture.CAPTURE_FAILHARD,
+        method = "checkInsideBlocks(Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/entity/InsideBlockEffectApplier$StepBasedCollector;Lit/unimi/dsi/fastutil/longs/LongSet;I)I",
+        at = @At("HEAD"),
         cancellable = true
     )
-    private void onCheckInsideBlocks(CallbackInfo ci, AABB box) {
-        if (box == null) {
-            ci.cancel();
+    private void onCheckInsideBlocks(
+        Vec3 from, Vec3 to,
+        net.minecraft.world.entity.InsideBlockEffectApplier.StepBasedCollector effectCollector,
+        it.unimi.dsi.fastutil.longs.LongSet visitedBlocks, int maxMovementIterations,
+        CallbackInfoReturnable<Integer> cir
+    ) {
+        if (ip_getActiveCollisionBox(makeBoundingBox(to)) == null) {
+            cir.setReturnValue(0);
         }
+    }
+
+    @Redirect(
+        method = "checkInsideBlocks(Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/entity/InsideBlockEffectApplier$StepBasedCollector;Lit/unimi/dsi/fastutil/longs/LongSet;I)I",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/world/entity/Entity;makeBoundingBox(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/AABB;"
+        )
+    )
+    private AABB redirectBoundingBoxInCheckingBlockCollision(Entity entity, Vec3 position) {
+        AABB box = makeBoundingBox(position);
+        AABB active = ip_getActiveCollisionBox(box);
+        return active != null ? active : box;
     }
     
     // avoid suffocation when colliding with a portal on wall
@@ -272,7 +278,7 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
             ip_portalCollisionHandler.update(this_);
         }
         
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             IPMcHelper.onClientEntityTick(this_);
         }
     }
@@ -330,10 +336,10 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
             ) {
                 this.blockPosition = new BlockPos(bx, by, bz);
                 this.inBlockState = null;
-                if (SectionPos.blockToSectionCoord(bx) != this.chunkPosition.x
-                    || SectionPos.blockToSectionCoord(bz) != this.chunkPosition.z
+                if (SectionPos.blockToSectionCoord(bx) != this.chunkPosition.x()
+                    || SectionPos.blockToSectionCoord(bz) != this.chunkPosition.z()
                 ) {
-                    this.chunkPosition = new ChunkPos(this.blockPosition);
+                    this.chunkPosition = Helper.newChunkPos(this.blockPosition);
                 }
             }
         }

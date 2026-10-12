@@ -87,7 +87,7 @@ public class FrustumCuller {
         }
         
         if (PortalRendering.isRendering()) {
-            Portal renderingPortal = PortalRendering.getRenderingPortal();
+            Portal renderingPortal = null; // portal rendering is not ported yet
             
             // do inner frustum culling
             
@@ -128,7 +128,7 @@ public class FrustumCuller {
             return null;
         }
         
-        Vec3 cameraPos = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vec3 cameraPos = Minecraft.getInstance().gameRenderer.mainCamera().position();
         return CHelper.getClientNearbyPortals(16).filter(
             portal -> portal.isInFrontOfPortal(cameraPos)
         ).filter(

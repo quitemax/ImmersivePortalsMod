@@ -1,4 +1,5 @@
 package qouteall.imm_ptl.core.chunk_loading;
+import qouteall.q_misc_util.Helper;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -113,7 +114,7 @@ public class ChunkVisibility {
             return new ChunkLoader(
                 new DimensionalChunkPos(
                     portal.getDestDim(),
-                    new ChunkPos(BlockPos.containing(
+                    Helper.newChunkPos(BlockPos.containing(
                         portal.transformPoint(player.position())
                     ))
                 ),
@@ -132,7 +133,7 @@ public class ChunkVisibility {
             return new ChunkLoader(
                 new DimensionalChunkPos(
                     portal.getDestDim(),
-                    new ChunkPos(BlockPos.containing(portal.getDestPos()))
+                    Helper.newChunkPos(BlockPos.containing(portal.getDestPos()))
                 ),
                 getCappedLoadingDistance(
                     portal, player,
@@ -157,7 +158,7 @@ public class ChunkVisibility {
             return new ChunkLoader(
                 new DimensionalChunkPos(
                     portal.getDestDim(),
-                    new ChunkPos(BlockPos.containing(transformedPos))
+                    Helper.newChunkPos(BlockPos.containing(transformedPos))
                 ),
                 renderDistance
             );
@@ -166,7 +167,7 @@ public class ChunkVisibility {
             return new ChunkLoader(
                 new DimensionalChunkPos(
                     portal.getDestDim(),
-                    new ChunkPos(BlockPos.containing(portal.getDestPos()))
+                    Helper.newChunkPos(BlockPos.containing(portal.getDestPos()))
                 ),
                 getCappedLoadingDistance(
                     portal, player, loadDistance / 4

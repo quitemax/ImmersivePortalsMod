@@ -4,7 +4,6 @@ import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.entity.PersistentEntitySectionManager;
-import net.minecraft.world.level.storage.DimensionDataStorage;
 import net.minecraft.world.level.storage.ServerLevelData;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,9 +23,6 @@ import java.util.List;
 public abstract class MixinServerLevel implements IEServerWorld {
     
     @Shadow
-    public abstract DimensionDataStorage getDataStorage();
-    
-    @Shadow
     public abstract ServerChunkCache getChunkSource();
     
     @Shadow
@@ -37,27 +33,27 @@ public abstract class MixinServerLevel implements IEServerWorld {
     @Final
     private PersistentEntitySectionManager<Entity> entityManager;
     
-    //in vanilla if a dimension has no player and no forced chunks then it will not tick
+    // in vanilla if a dimension has no player and no active chunk tickets then it will not tick entities
+    // (the empty time counter is reset when there are active tickets)
     @Redirect(
         method = "Lnet/minecraft/server/level/ServerLevel;tick(Ljava/util/function/BooleanSupplier;)V",
         at = @At(
             value = "INVOKE",
-            target = "Ljava/util/List;isEmpty()Z"
+            target = "Lnet/minecraft/server/level/ServerChunkCache;hasActiveTickets()Z"
         )
     )
-    private boolean redirectIsEmpty(List list) {
+    private boolean redirectHasActiveTickets(ServerChunkCache chunkCache) {
         final ServerLevel this_ = (ServerLevel) (Object) this;
         if (ImmPtlChunkTracking.shouldLoadDimension(this_.dimension())) {
-            return false;
+            return true;
         }
-        return list.isEmpty();
-    }
-    
+        return chunkCache.hasActiveTickets();
+    }    
     // for debug
     @Inject(method = "Lnet/minecraft/server/level/ServerLevel;toString()Ljava/lang/String;", at = @At("HEAD"), cancellable = true)
     private void onToString(CallbackInfoReturnable<String> cir) {
         final ServerLevel this_ = (ServerLevel) (Object) this;
-        cir.setReturnValue("ServerWorld " + this_.dimension().location() +
+        cir.setReturnValue("ServerWorld " + this_.dimension().identifier() +
             " " + serverLevelData.getLevelName());
     }
     

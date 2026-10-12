@@ -1,10 +1,18 @@
 package qouteall.imm_ptl.core.portal;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
+import qouteall.q_misc_util.my_util.ValueIoBridge;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
+
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.Hud;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -24,12 +32,14 @@ import qouteall.q_misc_util.my_util.IntBox;
 
 public class LoadingIndicatorEntity extends Entity {
     public static final EntityType<LoadingIndicatorEntity> entityType =
-        FabricEntityTypeBuilder.create(
-            MobCategory.MISC,
-            (EntityType.EntityFactory<LoadingIndicatorEntity>) LoadingIndicatorEntity::new
-        ).dimensions(
-            EntityDimensions.fixed(1, 1)
-        ).fireImmune().trackable(96, 20).build();
+        EntityType.Builder.of(
+            (EntityType.EntityFactory<LoadingIndicatorEntity>) LoadingIndicatorEntity::new,
+            MobCategory.MISC
+        ).sized(1, 1).fireImmune().clientTrackingRange(6).updateInterval(20)
+            .build(ResourceKey.create(
+                Registries.ENTITY_TYPE,
+                Identifier.fromNamespaceAndPath("immersive_portals", "loading_indicator")
+            ));
     
     private static final EntityDataAccessor<Component> TEXT = SynchedEntityData.defineId(
         LoadingIndicatorEntity.class, EntityDataSerializers.COMPONENT
@@ -106,6 +116,11 @@ public class LoadingIndicatorEntity extends Entity {
     }
     
     @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
+        return false;
+    }
+    
+    @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(TEXT, Component.literal("Loading..."));
         builder.define(BOX_LOW_POS, BlockPos.ZERO);
@@ -113,12 +128,14 @@ public class LoadingIndicatorEntity extends Entity {
     }
     
     @Override
-    protected void readAdditionalSaveData(CompoundTag tag) {
+    protected void readAdditionalSaveData(ValueInput tagInput) {
+        CompoundTag tag = ValueIoBridge.getTag(tagInput);
     
     }
     
     @Override
-    protected void addAdditionalSaveData(CompoundTag tag) {
+    protected void addAdditionalSaveData(ValueOutput tagOutput) {
+        CompoundTag tag = ValueIoBridge.getTag(tagOutput);
     
     }
     
@@ -148,7 +165,7 @@ public class LoadingIndicatorEntity extends Entity {
     
     @Environment(EnvType.CLIENT)
     private void showMessageClient() {
-        Gui inGameHud = Minecraft.getInstance().gui;
+        Hud inGameHud = Minecraft.getInstance().gui.hud;
         inGameHud.setOverlayMessage(
             getText(), false
         );

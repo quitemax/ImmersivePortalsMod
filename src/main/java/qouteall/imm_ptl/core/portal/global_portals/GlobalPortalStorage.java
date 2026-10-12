@@ -1,4 +1,6 @@
 package qouteall.imm_ptl.core.portal.global_portals;
+import qouteall.q_misc_util.my_util.ValueIoBridge;
+import net.minecraft.world.entity.EntitySpawnReason;
 
 import com.mojang.logging.LogUtils;
 import net.fabricmc.api.EnvType;
@@ -6,7 +8,6 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -15,7 +16,7 @@ import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.ClientCommonPacketListener;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,7 +24,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 import org.apache.commons.lang3.Validate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -46,6 +49,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.WeakHashMap;
 import java.util.function.Predicate;
 
 /**
@@ -94,21 +98,40 @@ public class GlobalPortalStorage extends SavedData {
     public static GlobalPortalStorage get(
         ServerLevel world
     ) {
-        return world.getDataStorage().computeIfAbsent(
-            new SavedData.Factory<>(
+        return world.getDataStorage().computeIfAbsent(getDataType(world));
+    }
+    
+    private static final WeakHashMap<ServerLevel, SavedDataType<GlobalPortalStorage>> DATA_TYPES = new WeakHashMap<>();
+    
+    /**
+     * In 26.x the saved data type has no access to the level on construction.
+     * So create a data type per level, capturing the level weakly.
+     * (The type is identified by its id, so all of them refer to the same file in the same level.)
+     */
+    private static SavedDataType<GlobalPortalStorage> getDataType(ServerLevel world) {
+        return DATA_TYPES.computeIfAbsent(world, w -> {
+            WeakReference<ServerLevel> worldRef = new WeakReference<>(w);
+            return new SavedDataType<>(
+                Identifier.fromNamespaceAndPath("immersive_portals", "global_portal"),
                 () -> {
-                    LOGGER.info("Global portal storage initialized {}", world.dimension().location());
-                    return new GlobalPortalStorage(world);
+                    ServerLevel level = worldRef.get();
+                    Validate.notNull(level, "world is null");
+                    LOGGER.info("Global portal storage initialized {}", level.dimension().identifier());
+                    return new GlobalPortalStorage(level);
                 },
-                (nbt, holderLookup) -> {
-                    GlobalPortalStorage globalPortalStorage = new GlobalPortalStorage(world);
-                    globalPortalStorage.fromNbt(nbt);
-                    return globalPortalStorage;
-                },
-                null
-            ),
-            "global_portal"
-        );
+                CompoundTag.CODEC.xmap(
+                    tag -> {
+                        ServerLevel level = worldRef.get();
+                        Validate.notNull(level, "world is null");
+                        GlobalPortalStorage storage = new GlobalPortalStorage(level);
+                        storage.fromNbt(tag);
+                        return storage;
+                    },
+                    storage -> storage.save(new CompoundTag())
+                ),
+                DataFixTypes.SAVED_DATA_COMMAND_STORAGE // no datafixer involved
+            );
+        });
     }
     
     @Environment(EnvType.CLIENT)
@@ -148,10 +171,10 @@ public class GlobalPortalStorage extends SavedData {
     public static Packet<ClientCommonPacketListener> createSyncPacket(
         ServerLevel world, GlobalPortalStorage storage
     ) {
-        return ServerPlayNetworking.createS2CPacket(
+        return ServerPlayNetworking.createClientboundPacket(
             new ImmPtlNetworking.GlobalPortalSyncPacket(
                 PortalAPI.serverDimKeyToInt(world.getServer(), world.dimension()),
-                storage.save(new CompoundTag(), world.registryAccess())
+                storage.save(new CompoundTag())
             )
         );
     }
@@ -208,13 +231,13 @@ public class GlobalPortalStorage extends SavedData {
         data = newData;
         
         if (tag.contains("version")) {
-            version = tag.getInt("version");
+            version = tag.getIntOr("version", 0);
         }
         
         if (tag.contains("bedrockReplacement")) {
             bedrockReplacement = NbtUtils.readBlockState(
                 currWorld.holderLookup(Registries.BLOCK),
-                tag.getCompound("bedrockReplacement")
+                tag.getCompoundOrEmpty("bedrockReplacement")
             );
         }
         else {
@@ -229,12 +252,12 @@ public class GlobalPortalStorage extends SavedData {
         Level currWorld
     ) {
         /**{@link CompoundTag#getType()}*/
-        ListTag listTag = tag.getList("data", 10);
+        ListTag listTag = tag.getListOrEmpty("data");
         
         List<Portal> newData = new ArrayList<>();
         
         for (int i = 0; i < listTag.size(); i++) {
-            CompoundTag compoundTag = listTag.getCompound(i);
+            CompoundTag compoundTag = listTag.getCompoundOrEmpty(i);
             Portal e = readPortalFromTag(currWorld, compoundTag);
             if (e != null) {
                 newData.add(e);
@@ -247,11 +270,11 @@ public class GlobalPortalStorage extends SavedData {
     }
     
     private static Portal readPortalFromTag(Level currWorld, CompoundTag compoundTag) {
-        ResourceLocation entityId = McHelper.newResourceLocation(compoundTag.getString("entity_type"));
-        EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.get(entityId);
+        Identifier entityId = McHelper.newResourceLocation(compoundTag.getStringOr("entity_type", ""));
+        EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.getValue(entityId);
         
-        Entity e = entityType.create(currWorld);
-        e.load(compoundTag);
+        Entity e = entityType.create(currWorld, EntitySpawnReason.LOAD);
+        ValueIoBridge.loadEntity(e, compoundTag);
         
         ((Portal) e).isGlobalPortal = true;
         
@@ -262,8 +285,7 @@ public class GlobalPortalStorage extends SavedData {
         return (Portal) e;
     }
     
-    @Override
-    public @NotNull CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
+    public @NotNull CompoundTag save(CompoundTag tag) {
         if (data == null) {
             return tag;
         }
@@ -275,7 +297,7 @@ public class GlobalPortalStorage extends SavedData {
         for (Portal portal : data) {
             Validate.isTrue(portal.level() == currWorld);
             CompoundTag portalTag = new CompoundTag();
-            portal.saveWithoutId(portalTag);
+            portalTag.merge(ValueIoBridge.saveEntity(portal));
             portalTag.putString(
                 "entity_type",
                 EntityType.getKey(portal.getType()).toString()
@@ -311,7 +333,7 @@ public class GlobalPortalStorage extends SavedData {
         data.removeIf(e -> {
             ResourceKey<Level> dimensionTo = ((Portal) e).getDestDim();
             if (server.getLevel(dimensionTo) == null) {
-                LOGGER.error("Missing Dimension for global portal {}", dimensionTo.location());
+                LOGGER.error("Missing Dimension for global portal {}", dimensionTo.identifier());
                 return true;
             }
             return false;
@@ -345,7 +367,7 @@ public class GlobalPortalStorage extends SavedData {
         
         ((IEClientWorld) world).ip_setGlobalPortals(newPortals);
         
-        LOGGER.info("Global Portals Updated {}", dimension.location());
+        LOGGER.info("Global Portals Updated {}", dimension.identifier());
     }
     
     public static void convertNormalPortalIntoGlobalPortal(Portal portal) {

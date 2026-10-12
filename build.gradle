@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.8-SNAPSHOT'
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
 
     id 'maven-publish'
 
@@ -43,11 +43,6 @@ repositories {
         }
     }
 
-    // for parchment
-    maven {
-        url = "https://maven.parchmentmc.org"
-    }
-
     // for cardinal components that gravity changer uses
     maven {
         name = 'Ladysnake'
@@ -62,69 +57,72 @@ repositories {
 
 loom {
     accessWidenerPath = file("src/main/resources/imm_ptl.accesswidener")
+    runs {
+        server {
+            vmArg "-Dmixin.debug.verbose=true"
+            vmArg "-Dmixin.debug.countInjections=true"
+        }
+        client {
+            vmArg "-Dmixin.debug.verbose=true"
+            vmArg "-Dmixin.debug.countInjections=true"
+        }
+    }
 }
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
 
-    mappings loom.layered() {
-        officialMojangMappings() {
-            setNameSyntheticMembers(false)
-        }
-        parchment("org.parchmentmc.data:parchment-1.21:2024.07.28")
-    }
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-
-    modImplementation("net.fabricmc.fabric-api:fabric-api:${project.fabric_version}") {
+    implementation("net.fabricmc.fabric-api:fabric-api:${project.fabric_version}") {
         exclude module: "fabric-gametest-api-v1"
         // for now, the gametest module makes client unable to login dev env server
     }
 
-    modApi("me.shedaniel.cloth:cloth-config-fabric:${cloth_config_version}") {
+    api("me.shedaniel.cloth:cloth-config-fabric:${cloth_config_version}") {
         exclude(group: "net.fabricmc.fabric-api")
     }
     include "me.shedaniel.cloth:cloth-config-fabric:${cloth_config_version}"
 
-    modCompileOnly "maven.modrinth:modmenu:${modmenu_version}"
-    modLocalRuntime "maven.modrinth:modmenu:${modmenu_version}"
+    compileOnly "maven.modrinth:modmenu:${modmenu_version}"
+    localRuntime "maven.modrinth:modmenu:${modmenu_version}"
 
-    modCompileOnly "${project.sodium_path}"
+    compileOnly "${project.sodium_path}"
 
-    modCompileOnly "${project.iris_path}"
+    compileOnly "${project.iris_path}"
 
-    modCompileOnly("com.github.qouteall:GravityChanger:${gravity_changer_version}") {
+    compileOnly("qouteall:gravity_changer:${gravity_changer_version}") {
         exclude(group: "net.fabricmc.fabric-api")
         transitive(false)
     }
 
-    modApi("com.github.iPortalTeam:DimLib:${dimlib_version}") {
+    api("qouteall.dimlib:dimlib:${dimlib_version}") {
         exclude(group: "net.fabricmc.fabric-api")
     }
-    include("com.github.iPortalTeam:DimLib:${dimlib_version}")
+    include("qouteall.dimlib:dimlib:${dimlib_version}")
 
     // put these into inner mod to reduce duplicate MC jar
 
     if (project.enable_sodium.equals('true')) {
-        modLocalRuntime "${project.sodium_path}"
+        localRuntime "${project.sodium_path}"
     }
 
     if (project.enable_iris.equals('true')) {
-        modLocalRuntime "${project.iris_path}"
+        localRuntime "${project.iris_path}"
         implementation "org.anarres:jcpp:1.4.14" // for iris
         implementation 'io.github.douira:glsl-transformer:2.0.0-pre13' // for iris
         implementation 'org.antlr:antlr4-runtime:4.11.1' // for iris
     }
 
     if (project.enable_gravity_changer.equals('true')) {
-        modLocalRuntime("com.github.qouteall:GravityChanger:${gravity_changer_version}") {
+        localRuntime("qouteall:gravity_changer:${gravity_changer_version}") {
             exclude(group: "net.fabricmc.fabric-api")
         }
     }
 
     if (project.enable_geckolib.equals('true')) {
         // for testing portal gun using dev jar
-        modLocalRuntime('software.bernie.geckolib:geckolib-fabric-1.20:4.2') {
+        localRuntime('software.bernie.geckolib:geckolib-fabric-1.20:4.2') {
             transitive(false)
         }
     }
@@ -144,11 +142,12 @@ dependencies {
 
             System.out.println("Found test mod: " + it.name.replace(".jar", "") + " -> " + name)
 
-            modImplementation name
+            implementation name
         }
     }
     testImplementation(platform('org.junit:junit-bom:5.10.0'))
     testImplementation('org.junit.jupiter:junit-jupiter')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
 }
 
 processResources {
@@ -160,7 +159,9 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    it.options.release = 17
+    it.options.release = 25
+    // show all errors during the 26.3 migration
+    it.options.compilerArgs << "-Xmaxerrs" << "10000"
 }
 
 java {
@@ -169,20 +170,16 @@ java {
     // If you remove this line, sources will not be generated.
     withSourcesJar()
 
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 
 // change the output file name
-remapJar {
-    afterEvaluate {
-        archiveFileName = "${project.archives_base_name}-${project.mod_version}-mc${project.minecraft_version}-fabric.jar"
-    }
-}
-
-
+// non-remapping loom: the plain jar is the mod jar
 jar {
+    archiveFileName = "${project.archives_base_name}-${project.mod_version}-mc${project.minecraft_version}-fabric.jar"
+
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}"}
     }
@@ -209,15 +206,15 @@ task printClasspath {
 
 // run test when building will slow down the build process
 // manually run when needed
-//test {
-//    useJUnitPlatform()
-//    testLogging {
-//        events "passed", "skipped", "failed"
-//    }
-//}
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
 
 publishMods {
-    file = remapJar.archiveFile
+    file = jar.archiveFile
     changelog = file("changelog.md").text
     type = ALPHA
     modLoaders.add("fabric")

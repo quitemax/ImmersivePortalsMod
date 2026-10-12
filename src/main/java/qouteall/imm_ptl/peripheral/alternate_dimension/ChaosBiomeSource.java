@@ -1,4 +1,5 @@
 package qouteall.imm_ptl.peripheral.alternate_dimension;
+import net.minecraft.world.level.biome.BiomeResolver;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -134,8 +135,8 @@ public class ChaosBiomeSource extends BiomeSource {
     }
     
     @Override
-    public Holder<Biome> getNoiseBiome(int x, int y, int z, Climate.Sampler sampler) {
-        return getRandomBiome(x, z);
+    public BiomeResolver createResolver(Climate.Sampler sampler) {
+        return (x, y, z) -> getRandomBiome(x, z);
     }
     
 }

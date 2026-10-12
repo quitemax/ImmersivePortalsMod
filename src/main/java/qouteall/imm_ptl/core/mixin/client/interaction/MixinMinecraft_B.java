@@ -1,4 +1,7 @@
 package qouteall.imm_ptl.core.mixin.client.interaction;
+import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.Inject;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -14,7 +17,7 @@ import qouteall.imm_ptl.core.block_manipulation.BlockManipulationClient;
 @Mixin(Minecraft.class)
 public abstract class MixinMinecraft_B {
     @Shadow
-    protected abstract void pickBlock();
+    protected abstract void pickBlockOrEntity();
     
     @Shadow
     public ClientLevel level;
@@ -104,7 +107,7 @@ public abstract class MixinMinecraft_B {
         method = "handleKeybinds",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/Minecraft;pickBlock()V"
+            target = "Lnet/minecraft/client/Minecraft;pickBlockOrEntity()V"
         )
     )
     private void wrapPickBlock(Minecraft instance, Operation<Void> original) {
@@ -126,6 +129,23 @@ public abstract class MixinMinecraft_B {
         }
         else {
             original.call(instance);
+        }
+    }
+
+    // do not update the target when rendering portals
+    @Inject(method = "pick(F)V", at = @At("HEAD"), cancellable = true)
+    private void onUpdateTargetedEntity(float partialTick, CallbackInfo ci) {
+        if (level != null) {
+            if (WorldRenderInfo.isRendering()) {
+                ci.cancel();
+            }
+        }
+    }
+
+    @Inject(method = "pick(F)V", at = @At("RETURN"))
+    private void onUpdateTargetedEntityFinish(float partialTick, CallbackInfo ci) {
+        if (level != null) {
+            BlockManipulationClient.updatePointedBlock(partialTick);
         }
     }
 }

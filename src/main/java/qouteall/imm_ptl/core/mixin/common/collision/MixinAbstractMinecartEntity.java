@@ -1,6 +1,6 @@
 package qouteall.imm_ptl.core.mixin.common.collision;
 
-import net.minecraft.world.entity.vehicle.AbstractMinecart;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -11,11 +11,11 @@ import qouteall.imm_ptl.core.IPGlobal;
 public class MixinAbstractMinecartEntity {
     // for debugging
     @Inject(
-        method = "lerpTo",
+        method = "lerpPositionAndRotationStep",
         at = @At("RETURN")
     )
     private void onUpdateTracketPositionAndAngles(
-        double x, double y, double z, float yaw, float pitch, int steps, CallbackInfo ci
+        int steps, double x, double y, double z, double yaw, double pitch, CallbackInfo ci
     ) {
         AbstractMinecart this_ = (AbstractMinecart) ((Object) this);
         if (!IPGlobal.allowClientEntityPosInterpolation) {

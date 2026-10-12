@@ -1,4 +1,5 @@
 package qouteall.imm_ptl.core.portal.custom_portal_gen;
+import net.minecraft.world.entity.EntitySpawnReason;
 
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceKey;
@@ -71,7 +72,7 @@ public class PortalGenInfo {
     public <T extends Portal> T createTemplatePortal(EntityType<T> entityType) {
         ServerLevel fromWorld = McHelper.getServerWorld(from);
         
-        T portal = entityType.create(fromWorld);
+        T portal = entityType.create(fromWorld, EntitySpawnReason.LOAD);
         assert portal != null;
         fromShape.initPortalPosAxisShape(portal, Direction.AxisDirection.POSITIVE);
         portal.setDestDim(to);

@@ -7,6 +7,8 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
@@ -16,8 +18,8 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Tuple;
+import net.minecraft.resources.Identifier;
+import qouteall.q_misc_util.my_util.Tuple;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -219,7 +221,7 @@ public class Helper {
         return Direction.get(
             Direction.AxisDirection.POSITIVE,
             axis
-        ).getNormal();
+        ).getUnitVec3i();
     }
     
     public static int getCoordinate(Vec3i v, Direction.Axis axis) {
@@ -406,7 +408,7 @@ public class Helper {
     
     public static AABB getBoxSurfaceInversed(AABB box, Direction direction) {
         double size = getCoordinate(getBoxSize(box), direction.getAxis());
-        Vec3 shrinkVec = Vec3.atLowerCornerOf(direction.getNormal()).scale(size);
+        Vec3 shrinkVec = Vec3.atLowerCornerOf(direction.getUnitVec3i()).scale(size);
         return box.contract(shrinkVec.x, shrinkVec.y, shrinkVec.z);
     }
     
@@ -501,7 +503,7 @@ public class Helper {
         return x1 * y2 - x2 * y1;
     }
     
-    public static ResourceKey<Level> dimIdToKey(ResourceLocation identifier) {
+    public static ResourceKey<Level> dimIdToKey(Identifier identifier) {
         return ResourceKey.create(Registries.DIMENSION, identifier);
     }
     
@@ -510,14 +512,14 @@ public class Helper {
     }
     
     public static void putWorldId(CompoundTag tag, String tagName, ResourceKey<Level> dim) {
-        tag.putString(tagName, dim.location().toString());
+        tag.putString(tagName, dim.identifier().toString());
     }
     
     public static ResourceKey<Level> getWorldId(CompoundTag tag, String tagName) {
         Tag term = tag.get(tagName);
         
-        if (term instanceof StringTag) {
-            String id = ((StringTag) term).getAsString();
+        if (term instanceof StringTag stringTag) {
+            String id = stringTag.value();
             return dimIdToKey(id);
         }
         
@@ -631,9 +633,9 @@ public class Helper {
     
     public static Vec3 getVec3d(CompoundTag compoundTag, String name) {
         return new Vec3(
-            compoundTag.getDouble(name + "X"),
-            compoundTag.getDouble(name + "Y"),
-            compoundTag.getDouble(name + "Z")
+            compoundTag.getDoubleOr(name + "X", 0),
+            compoundTag.getDoubleOr(name + "Y", 0),
+            compoundTag.getDoubleOr(name + "Z", 0)
         );
     }
     
@@ -655,12 +657,58 @@ public class Helper {
     
     public static BlockPos getVec3i(CompoundTag compoundTag, String name) {
         return new BlockPos(
-            compoundTag.getInt(name + "X"),
-            compoundTag.getInt(name + "Y"),
-            compoundTag.getInt(name + "Z")
+            compoundTag.getIntOr(name + "X", 0),
+            compoundTag.getIntOr(name + "Y", 0),
+            compoundTag.getIntOr(name + "Z", 0)
         );
     }
     
+    /**
+     * Write a UUID in the vanilla int array format (replacement of removed {@code CompoundTag.putUUID}).
+     */
+    public static void putUuidArray(CompoundTag tag, String key, UUID uuid) {
+        tag.putIntArray(key, UUIDUtil.uuidToIntArray(uuid));
+    }
+
+    /**
+     * Replacement of the removed {@code CompoundTag.getUUID}. Returns null if missing or malformed.
+     */
+    @Nullable
+    public static UUID getUuidArray(CompoundTag tag, String key) {
+        return tag.getIntArray(key)
+            .filter(arr -> arr.length == 4)
+            .map(UUIDUtil::uuidFromIntArray)
+            .orElse(null);
+    }
+
+    /**
+     * Replacement of the removed vanilla {@code new ChunkPos(BlockPos)} constructor.
+     */
+    public static ChunkPos newChunkPos(BlockPos blockPos) {
+        return ChunkPos.containing(blockPos);
+    }
+
+    /**
+     * Replacement of the removed vanilla {@code new ChunkPos(long)} constructor.
+     */
+    public static ChunkPos newChunkPos(long packed) {
+        return ChunkPos.unpack(packed);
+    }
+
+    /**
+     * Replacement of the removed vanilla {@code Direction.fromDelta}.
+     * Returns null if the delta is not a unit vector along an axis.
+     */
+    @Nullable
+    public static Direction directionFromDelta(int x, int y, int z) {
+        for (Direction direction : Direction.values()) {
+            if (direction.getStepX() == x && direction.getStepY() == y && direction.getStepZ() == z) {
+                return direction;
+            }
+        }
+        return null;
+    }
+
     public static void putQuaternion(CompoundTag compoundTag, String name, @Nullable DQuaternion quaternion) {
         if (quaternion != null) {
             compoundTag.putDouble(name + "X", quaternion.getX());
@@ -674,10 +722,10 @@ public class Helper {
     public static DQuaternion getQuaternion(CompoundTag compoundTag, String name) {
         if (compoundTag.contains(name + "X")) {
             return new DQuaternion(
-                compoundTag.getDouble(name + "X"),
-                compoundTag.getDouble(name + "Y"),
-                compoundTag.getDouble(name + "Z"),
-                compoundTag.getDouble(name + "W")
+                compoundTag.getDoubleOr(name + "X", 0),
+                compoundTag.getDoubleOr(name + "Y", 0),
+                compoundTag.getDoubleOr(name + "Z", 0),
+                compoundTag.getDoubleOr(name + "W", 0)
             );
         }
         else {
@@ -686,7 +734,7 @@ public class Helper {
     }
     
     public static ListTag getCompoundList(CompoundTag tag, String name) {
-        return tag.getList(name, 10);
+        return tag.getListOrEmpty(name);
     }
     
     /**
@@ -927,7 +975,7 @@ public class Helper {
             return null;
         }
         
-        return new UUID(tag.getLong(key1), tag.getLong(key + "Least"));
+        return new UUID(tag.getLongOr(key1, 0), tag.getLongOr(key + "Least", 0));
     }
     
     public static Vec3 getFlippedVec(Vec3 vec, Vec3 flippingAxis) {
@@ -1464,11 +1512,11 @@ public class Helper {
     
     public static @Nullable Vec3 vec3FromListTag(Tag tag) {
         if (tag instanceof ListTag listTag) {
-            if (listTag.getElementType() == Tag.TAG_DOUBLE && listTag.size() == 3) {
+            if (listTag.size() == 3 && listTag.getDouble(0).isPresent() && listTag.getDouble(1).isPresent() && listTag.getDouble(2).isPresent()) {
                 return new Vec3(
-                    listTag.getDouble(0),
-                    listTag.getDouble(1),
-                    listTag.getDouble(2)
+                    listTag.getDoubleOr(0, 0),
+                    listTag.getDoubleOr(1, 0),
+                    listTag.getDoubleOr(2, 0)
                 );
             }
         }

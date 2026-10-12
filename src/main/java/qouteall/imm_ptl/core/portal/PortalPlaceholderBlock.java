@@ -1,8 +1,16 @@
 package qouteall.imm_ptl.core.portal;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ScheduledTickAccess;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.util.profiling.Profiler;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.object.builder.v1.block.FabricBlockSettings;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.BlockGetter;
@@ -51,13 +59,14 @@ public class PortalPlaceholderBlock extends Block {
     );
     
     public static final PortalPlaceholderBlock instance = new PortalPlaceholderBlock(
-        FabricBlockSettings.create()
-            .noCollission()
+        BlockBehaviour.Properties.of()
+            .noCollision()
             .sound(SoundType.GLASS)
             .strength(1.0f, 0)
             .noOcclusion()
             .noLootTable()
             .lightLevel((s) -> 15)
+            .setId(ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("immersive_portals", "nether_portal_block")))
     );
     
     public PortalPlaceholderBlock(Properties properties) {
@@ -90,20 +99,22 @@ public class PortalPlaceholderBlock extends Block {
     }
     
     @Override
-    public BlockState updateShape(
+    protected BlockState updateShape(
         BlockState thisState,
-        Direction direction,
-        BlockState neighborState,
-        LevelAccessor worldAccess,
+        LevelReader worldAccess,
+        ScheduledTickAccess ticks,
         BlockPos blockPos,
-        BlockPos neighborPos
+        Direction direction,
+        BlockPos neighborPos,
+        BlockState neighborState,
+        RandomSource random
     ) {
         if (!worldAccess.isClientSide()) {
             if (worldAccess instanceof Level) {
                 Level world = (Level) worldAccess;
-                
-                world.getProfiler().push("portal_placeholder");
-                
+
+                Profiler.get().push("portal_placeholder");
+
                 Direction.Axis axis = thisState.getValue(AXIS);
                 if (direction.getAxis() != axis) {
                     McHelper.findEntitiesRough(
@@ -118,21 +129,23 @@ public class PortalPlaceholderBlock extends Block {
                         }
                     );
                 }
-                
-                world.getProfiler().pop();
+
+                Profiler.get().pop();
             }
         }
-        
+
         return super.updateShape(
             thisState,
-            direction,
-            neighborState,
             worldAccess,
+            ticks,
             blockPos,
-            neighborPos
+            direction,
+            neighborPos,
+            neighborState,
+            random
         );
     }
-    
+
     public static boolean isHitOnPlaceholder(HitResult hitResult, Level world) {
         if (hitResult.getType() == HitResult.Type.BLOCK) {
             if (hitResult instanceof BlockHitResult blockHitResult) {
@@ -145,22 +158,17 @@ public class PortalPlaceholderBlock extends Block {
     
     //---------These are copied from BlockBarrier
     @Override
-    public boolean propagatesSkylightDown(
-        BlockState blockState_1,
-        BlockGetter blockView_1,
-        BlockPos blockPos_1
-    ) {
+    protected boolean propagatesSkylightDown(BlockState blockState_1) {
         return true;
     }
     
     @Override
-    public RenderShape getRenderShape(BlockState blockState_1) {
+    protected RenderShape getRenderShape(BlockState blockState_1) {
         return RenderShape.INVISIBLE;
     }
     
-    @Environment(EnvType.CLIENT)
     @Override
-    public float getShadeBrightness(
+    protected float getShadeBrightness(
         BlockState blockState_1,
         BlockGetter blockView_1,
         BlockPos blockPos_1

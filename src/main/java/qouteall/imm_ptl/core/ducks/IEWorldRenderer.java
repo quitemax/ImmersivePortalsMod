@@ -2,7 +2,6 @@ package qouteall.imm_ptl.core.ducks;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.ViewArea;
@@ -16,15 +15,6 @@ public interface IEWorldRenderer {
     
     ViewArea ip_getBuiltChunkStorage();
     
-    void ip_myRenderEntity(
-        Entity entity,
-        double cameraX,
-        double cameraY,
-        double cameraZ,
-        float partialTick,
-        PoseStack matrixStack,
-        MultiBufferSource vertexConsumerProvider
-    );
     
     PostChain portal_getTransparencyShader();
     

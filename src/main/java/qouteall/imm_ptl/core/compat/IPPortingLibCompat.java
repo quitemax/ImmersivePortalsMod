@@ -30,39 +30,5 @@ public class IPPortingLibCompat {
         }
     }
     
-    @Environment(EnvType.CLIENT)
-    public static boolean getIsStencilEnabled(RenderTarget renderTarget) {
-        if (isPortingLibPresent) {
-            return Helper.noError(
-                () -> (Boolean) f_port_lib$stencilEnabled.get(renderTarget)
-            );
-        }
-        else {
-            return ((IEFrameBuffer) renderTarget).ip_getIsStencilBufferEnabled();
-        }
-    }
     
-    @Environment(EnvType.CLIENT)
-    public static void setIsStencilEnabled(RenderTarget renderTarget, boolean cond) {
-        if (isPortingLibPresent) {
-            
-            boolean oldValue = getIsStencilEnabled(renderTarget);
-            
-            if (oldValue != cond) {
-                Helper.noError(
-                    () -> {
-                        f_port_lib$stencilEnabled.set(renderTarget, cond);
-                        return null;
-                    }
-                );
-                renderTarget.resize(
-                    renderTarget.viewWidth, renderTarget.viewHeight, Minecraft.ON_OSX
-                );
-            }
-        }
-        else {
-            ((IEFrameBuffer) renderTarget).ip_setIsStencilBufferEnabledAndReload(cond);
-        }
-        
-    }
 }

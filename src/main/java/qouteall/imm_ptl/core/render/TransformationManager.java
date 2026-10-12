@@ -1,13 +1,12 @@
 package qouteall.imm_ptl.core.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.Direction;
-import net.minecraft.util.Tuple;
+import qouteall.q_misc_util.my_util.Tuple;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -85,22 +84,14 @@ public class TransformationManager {
         return null;
     }
     
-    private static void processTransformation(Camera camera, PoseStack matrixStack) {
+    public static Matrix4f processTransformation(Camera camera, Matrix4f matrix4f) {
         DQuaternion currentAnimationDelta = getCurrentAnimationDelta();
         if (currentAnimationDelta != null) {
-            matrixStack.mulPose(currentAnimationDelta.toMcQuaternion());
+            matrix4f.rotate(currentAnimationDelta.toMcQuaternion());
         }
-        
-        WorldRenderInfo.applyAdditionalTransformations(matrixStack);
-    }
-    
-    public static Matrix4f processTransformation(Camera camera, Matrix4f matrix4f) {
-        PoseStack poseStack = new PoseStack();
-        poseStack.last().pose().set(matrix4f);
-        processTransformation(camera, poseStack);
-        return poseStack.last().pose();
-    }
-    
+
+        return matrix4f;
+    }    
     public static boolean isAnimationRunning() {
         return getAnimationProgress() != null;
     }
@@ -228,16 +219,8 @@ public class TransformationManager {
     }
     
     private static void updateCamera(Minecraft client) {
-        Camera camera = client.gameRenderer.getMainCamera();
-        camera.setup(
-            client.level,
-            client.player,
-            !client.options.getCameraType().isFirstPerson(),
-            client.options.getCameraType().isMirrored(),
-            RenderStates.getPartialTick()
-        );
-    }
-    
+        // TODO the camera is updated by the game renderer in 26.x
+    }    
     public static Matrix4f getMirrorTransformation(Vec3 normal) {
         float x = (float) normal.x;
         float y = (float) normal.y;
@@ -302,12 +285,12 @@ public class TransformationManager {
     
     // isometric is equivalent to the camera being in infinitely far place
     public static Vec3 getIsometricAdjustedCameraPos() {
-        Camera camera = client.gameRenderer.getMainCamera();
+        Camera camera = client.gameRenderer.mainCamera();
         return getIsometricAdjustedCameraPos(camera);
     }
     
     public static Vec3 getIsometricAdjustedCameraPos(Camera camera) {
-        Vec3 cameraPos = camera.getPosition();
+        Vec3 cameraPos = camera.position();
         
         if (!isIsometricView) {
             return cameraPos;
